@@ -89,10 +89,15 @@ public:
 	HEIMDALLR_PROPERTY()
 		MyNameSpace::TestStruct testStruct;
 
-
-
+private:
 	HEIMDALLR_FUNCTION(Category = "Hola a todos", HideInEditor)
-		bool MyFunctionWithNameX(char c, bool isAwaken) const
+	inline bool MyFunctionWithNameX(char c, bool isAwaken) const
+	{
+		return false;
+	}
+
+	HEIMDALLR_FUNCTION(Category = "Hola a nadie", HideInEditor)
+	inline bool MyFunctionWithNameX(char c, int a) const
 	{
 		return false;
 	}

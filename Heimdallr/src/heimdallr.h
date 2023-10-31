@@ -20,18 +20,19 @@ __attribute__((annotate(_HEIMDALLR_REFLECTION_ANNOTATION_ #__VA_ARGS__)))
 
 #define _INTERNAL_HEIMDALLR_VARIABLE2_(Line) Heimdallr_##Line
 #define _INTERNAL_HEIMDALLR_VARIABLE_(Line) _INTERNAL_HEIMDALLR_VARIABLE2_(Line)
-#define HEIMDALLR_CLASS(...)	class _REFLECT_(heimdallr-class, heimdallr-attrs: __VA_ARGS__) _INTERNAL_HEIMDALLR_VARIABLE_(__LINE__);
-#define HEIMDALLR_STRUCT(...)	struct _REFLECT_(heimdallr-struct, heimdallr-attrs: __VA_ARGS__) _INTERNAL_HEIMDALLR_VARIABLE_(__LINE__);
-#define HEIMDALLR_PROPERTY(...) _REFLECT_(heimdallr-property, heimdallr-attrs: __VA_ARGS__)
-#define HEIMDALLR_FUNCTION(...) _REFLECT_(heimdallr-function, heimdallr-attrs: __VA_ARGS__)
-#define HEIMDALLR_ENUM(...)		enum class _REFLECT_(heimdallr-enum, heimdallr-attrs: __VA_ARGS__) _INTERNAL_HEIMDALLR_VARIABLE_(__LINE__);
+#define HEIMDALLR_CLASS(...)		class _REFLECT_(heimdallr-class, heimdallr-attrs: __VA_ARGS__) _INTERNAL_HEIMDALLR_VARIABLE_(__LINE__);
+#define HEIMDALLR_STRUCT(...)		struct _REFLECT_(heimdallr-struct, heimdallr-attrs: __VA_ARGS__) _INTERNAL_HEIMDALLR_VARIABLE_(__LINE__);
+#define HEIMDALLR_PROPERTY(...)		_REFLECT_(heimdallr-property, heimdallr-attrs: __VA_ARGS__)
+#define HEIMDALLR_FUNCTION(...)		_REFLECT_(heimdallr-function, heimdallr-attrs: __VA_ARGS__)
+#define HEIMDALLR_ENUM(...)			enum class _REFLECT_(heimdallr-enum, heimdallr-attrs: __VA_ARGS__) _INTERNAL_HEIMDALLR_VARIABLE_(__LINE__);
 
 #else
 #define _REFLECT_(...)
 #define HEIMDALLR_CLASS(...)		_REFLECT_(__VA_ARGS__)
 #define HEIMDALLR_STRUCT(...)		_REFLECT_(__VA_ARGS__)
 #define HEIMDALLR_PROPERTY(...)		_REFLECT_(__VA_ARGS__)
-#define HEIMDALLR_FUNCTION(...)		_REFLECT_(__VA_ARGS__)
+#define HEIMDALLR_FUNCTION(...)		template<typename Func> friend struct hmdl::__internal__::FunctionInvoker; \
+									_REFLECT_(__VA_ARGS__)
 #define HEIMDALLR_ENUM(...)			_REFLECT_(__VA_ARGS__)
 #endif
 
@@ -112,6 +113,12 @@ namespace hmdl
 			std::array<PropertyInfo, NParams> m_Parameters;
 			std::function<ReturnType(void*, Args...)> m_InvokeFunc;
 			// todo: Qualifiers
+		};
+
+		template<typename Func>
+		struct FunctionInvoker
+		{
+			constexpr static Func Invoke;
 		};
 
 		template<typename T>

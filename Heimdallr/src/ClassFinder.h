@@ -47,6 +47,7 @@ public:
     void GenerateFunctionStorageBody(clang::ASTContext* ctx, llvm::raw_ostream& os, int index);
     std::string GetFunctionStorageTemplateParamsString(int index);
     std::string GetFunctionSignatureString(int index);
+    std::string GetFunctionPtrSignatureString(int index);
     std::string GetFunctionLambdaSignatureString(int index);
     std::string GetFunctionLambdaParamsString(int index);
     std::string GetFunctionLambdaParamsPlacementString(int index);

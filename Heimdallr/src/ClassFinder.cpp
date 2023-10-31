@@ -397,14 +397,24 @@ void ReflectedClass::GenerateFunction(clang::ASTContext* ctx, llvm::raw_ostream&
 	std::string prefix = Utils::GetFullScopeNamePrefix(m_Record->getParent(), true, "_");
 	std::string typeName = m_Record->getName().str();
 
-	os << "#define FUNCTION_STORAGE_VARIABLE" << std::to_string(index) << " " << prefix << typeName << "_" << m_Functions[index]->getName() << "_Heimdallr_FunctionStorage" << "\n";
+	os << "#define FUNCTION_STORAGE_VARIABLE" << std::to_string(index) << " " << prefix << typeName << "_" << m_Functions[index]->getName() << std::to_string(index) << "_Heimdallr_FunctionStorage" << "\n";
 	os << "#define FUNCTION_STORAGE_ARGS " << GetFunctionStorageTemplateParamsString(index) << "\n";
 	os << "#define FUNCTION_NAME " << m_Functions[index]->getName() << "\n";
 	os << "#define FUNCTION_SIGNATURE " << GetFunctionSignatureString(index) << "\n";
+	os << "#define FUNCTION_PTR_SIGNATURE " << GetFunctionPtrSignatureString(index) << "\n";
+	os << "#define FUNCTION_INVOKER " << prefix << typeName << "_" << m_Functions[index]->getName() << std::to_string(index) << "_Heimdallr_FunctionInvoker" << "\n";
 	os << "#define FUNCTION_LAMBDA_SIGNATURE " << GetFunctionLambdaSignatureString(index) << "\n";
 	{
 		os << "namespace __internal__" << "\n";
 		os << "{" << "\n";
+
+		os << "template<> struct FunctionInvoker<FUNCTION_PTR_SIGNATURE>" << "\n";
+		os << "{" << "\n";
+		os << "using Func = FUNCTION_PTR_SIGNATURE;" << "\n";
+		os << "constexpr static Func Invoke = &CLASS_TYPE::FUNCTION_NAME;" << "\n";
+		os << "};" << "\n";
+		os << "using FUNCTION_INVOKER = FunctionInvoker<FUNCTION_PTR_SIGNATURE>;" << "\n";
+
 		os << "namespace // anonymous namespace" << "\n";
 		os << "{" << "\n";
 		os << "inline FunctionStorage<FUNCTION_STORAGE_ARGS> FUNCTION_STORAGE_VARIABLE" << std::to_string(index) << "(" << "\n";
@@ -420,6 +430,8 @@ void ReflectedClass::GenerateFunction(clang::ASTContext* ctx, llvm::raw_ostream&
 	os << "#undef FUNCTION_STORAGE_ARGS" << "\n";
 	os << "#undef FUNCTION_NAME" << "\n";
 	os << "#undef FUNCTION_SIGNATURE" << "\n";
+	os << "#undef FUNCTION_PTR_SIGNATURE" << "\n";
+	os << "#undef FUNCTION_INVOKER" << "\n";
 	os << "#undef FUNCTION_LAMBDA_SIGNATURE" << "\n";
 }
 
@@ -456,7 +468,7 @@ void ReflectedClass::GenerateFunctionStorageBody(clang::ASTContext* ctx, llvm::r
 	os << "{" << "\n";
 	os << "CLASS_TYPE* o = static_cast<CLASS_TYPE*>(obj);" << "\n";
 	os << "if (o == nullptr) return (" << m_Functions[index]->getReturnType().getAsString(m_PrintingPolicy) << ")0;" << "\n";
-	os << "return o->FUNCTION_NAME(" << GetFunctionLambdaParamsPlacementString(index) << ");" << "\n";
+	os << "return (o->*FUNCTION_INVOKER::Invoke)(" << GetFunctionLambdaParamsPlacementString(index) << ");" << "\n";
 	os << "};" << "\n";
 
 	os << "self->m_InvokeFunc = FunctionLambda;" << "\n";
@@ -489,6 +501,36 @@ std::string ReflectedClass::GetFunctionSignatureString(int index)
 		res += m_Functions[index]->parameters()[i]->getType().getAsString(m_PrintingPolicy);
 	}
 	res += ")";
+	return res;
+}
+
+std::string ReflectedClass::GetFunctionPtrSignatureString(int index)
+{
+	// in a 2 parameter functions, result should be: "void(CLASS_TYPE::*)(int, char) const"
+	std::string res;
+	if (m_Functions[index]->isConstexpr())
+	{
+		res += "constexpr ";
+	}
+
+	res += m_Functions[index]->getReturnType().getAsString(m_PrintingPolicy);
+	res += "(CLASS_TYPE::*)";
+	res += "(";
+	for (int i = 0; i < m_Functions[index]->parameters().size(); ++i)
+	{
+		if (i != 0) res += ", ";
+		res += m_Functions[index]->parameters()[i]->getType().getAsString(m_PrintingPolicy);
+	}
+	res += ")";
+
+	if (const clang::CXXMethodDecl* methodDecl = clang::dyn_cast<clang::CXXMethodDecl>(m_Functions[index]))
+	{
+		if (methodDecl->isConst())
+		{
+			res += " const";
+		}
+	}
+
 	return res;
 }
 
