@@ -221,13 +221,18 @@ void ReflectedClass::GenerateClass(clang::ASTContext* ctx, llvm::raw_ostream& os
 			os << "}" << "\n";
 			os << ");" << "\n";
 			os << "\n";
+			os << "#define CLASS_DEFAULT_VALUE_VARIABLE " << prefix << typeName << "_Heimdallr_Class_DefaultValue" << "\n";
 			os << "#define CLASS_INFO_VARIABLE " << prefix << typeName << "_Heimdallr_ClassInfo" << "\n";
+			os << "#define CLASS_INFO_REGISTER_VARIABLE " << prefix << typeName << "_Heimdallr_ClassInfo_Register" << "\n";
+			os << (m_Record->hasDefaultConstructor() ? "inline CLASS_TYPE CLASS_DEFAULT_VALUE_VARIABLE = {};" : "") << "\n";
 			os << "inline ClassInfo CLASS_INFO_VARIABLE" << "\n";
 			os << "{" << "\n";
 			os << "TypeInfo::InvalidID," << "\n";
 			os << "\"" << typeName << "\"," << "\n";
 			os << "\"" << Utils::GetFullScopeNamePrefix(m_Record->getParent()) << typeName << "\"," << "\n";
 			os << "sizeof(CLASS_TYPE)," << "\n";
+			os << "alignof(CLASS_TYPE)," << "\n";
+			os << (m_Record->hasDefaultConstructor() ? "&CLASS_DEFAULT_VALUE_VARIABLE," : "nullptr,") << "\n";
 			os << "CLASS_STORAGE_VARIABLE.m_ParentClasses.data()," << "\n";
 			os << "CLASS_STORAGE_VARIABLE.ParentClassesCount," << "\n";
 			os << "CLASS_STORAGE_VARIABLE.m_Fields.data()," << "\n";
@@ -237,15 +242,16 @@ void ReflectedClass::GenerateClass(clang::ASTContext* ctx, llvm::raw_ostream& os
 			os << "CLASS_STORAGE_VARIABLE.m_Attributes" << "\n";
 			os << "};" << "\n";
 			os << "\n";
+			os << "inline hmdl::__internal__::registry::RegisterHelper CLASS_INFO_REGISTER_VARIABLE(&CLASS_INFO_VARIABLE);" << "\n";
 		}
 		os << "} // anonymous namespace" << "\n";
 
-		os << "template <> const TypeInfo* GetTypeImpl(TemplatedTag<CLASS_TYPE>) noexcept" << "\n";
+		os << "template<> const TypeInfo* GetTypeImpl(TemplatedTag<CLASS_TYPE>) noexcept" << "\n";
 		os << "{" << "\n";
 		os << "return GetClass<CLASS_TYPE>();" << "\n";
 		os << "}" << "\n";
 		os << "\n";
-		os << "template <> const ClassInfo* GetClassImpl(TemplatedTag<CLASS_TYPE>) noexcept" << "\n";
+		os << "template<> const ClassInfo* GetClassImpl(TemplatedTag<CLASS_TYPE>) noexcept" << "\n";
 		os << "{" << "\n";
 		os << "return &CLASS_INFO_VARIABLE;" << "\n";
 		os << "}" << "\n";
@@ -253,9 +259,11 @@ void ReflectedClass::GenerateClass(clang::ASTContext* ctx, llvm::raw_ostream& os
 	}
 	os << "} // __internal__" << "\n";
 
+	os << "#undef CLASS_DEFAULT_VALUE_VARIABLE" << "\n";
 	os << "#undef CLASS_STORAGE_VARIABLE" << "\n";
 	os << "#undef CLASS_STORAGE_ARGS" << "\n";
 	os << "#undef CLASS_INFO_VARIABLE" << "\n";
+	os << "#undef CLASS_INFO_REGISTER_VARIABLE" << "\n";
 
 }
 
@@ -402,18 +410,19 @@ void ReflectedClass::GenerateFunction(clang::ASTContext* ctx, llvm::raw_ostream&
 	os << "#define FUNCTION_NAME " << m_Functions[index]->getName() << "\n";
 	os << "#define FUNCTION_SIGNATURE " << GetFunctionSignatureString(index) << "\n";
 	os << "#define FUNCTION_PTR_SIGNATURE " << GetFunctionPtrSignatureString(index) << "\n";
+	os << "#define FUNCTION_INDEX " << std::to_string(index) << "\n";
 	os << "#define FUNCTION_INVOKER " << prefix << typeName << "_" << m_Functions[index]->getName() << std::to_string(index) << "_Heimdallr_FunctionInvoker" << "\n";
 	os << "#define FUNCTION_LAMBDA_SIGNATURE " << GetFunctionLambdaSignatureString(index) << "\n";
 	{
 		os << "namespace __internal__" << "\n";
 		os << "{" << "\n";
 
-		os << "template<> struct FunctionInvoker<FUNCTION_PTR_SIGNATURE>" << "\n";
+		os << "template<> struct FunctionInvoker<CLASS_TYPE, FUNCTION_PTR_SIGNATURE, FUNCTION_INDEX>" << "\n";
 		os << "{" << "\n";
 		os << "using Func = FUNCTION_PTR_SIGNATURE;" << "\n";
 		os << "constexpr static Func Invoke = &CLASS_TYPE::FUNCTION_NAME;" << "\n";
 		os << "};" << "\n";
-		os << "using FUNCTION_INVOKER = FunctionInvoker<FUNCTION_PTR_SIGNATURE>;" << "\n";
+		os << "using FUNCTION_INVOKER = FunctionInvoker<CLASS_TYPE, FUNCTION_PTR_SIGNATURE, FUNCTION_INDEX>;" << "\n";
 
 		os << "namespace // anonymous namespace" << "\n";
 		os << "{" << "\n";
@@ -431,6 +440,7 @@ void ReflectedClass::GenerateFunction(clang::ASTContext* ctx, llvm::raw_ostream&
 	os << "#undef FUNCTION_NAME" << "\n";
 	os << "#undef FUNCTION_SIGNATURE" << "\n";
 	os << "#undef FUNCTION_PTR_SIGNATURE" << "\n";
+	os << "#undef FUNCTION_INDEX" << "\n";
 	os << "#undef FUNCTION_INVOKER" << "\n";
 	os << "#undef FUNCTION_LAMBDA_SIGNATURE" << "\n";
 }
@@ -721,7 +731,9 @@ void ReflectedEnum::Generate(clang::ASTContext* ctx, llvm::raw_ostream& os)
 
 			os << "#define ENUM_TYPE " << Utils::GetFullScopeNamePrefix(m_EnumDecl->getParent()) << enumName << "\n";
 			os << "#define ENUM_COUNT " << std::to_string(count) << "\n";
+			os << "#define ENUM_DEFAULT_VALUE_VARIABLE " << prefix << enumName << "_Heimdallr_Enum_DefaultValue" << "\n";
 			os << "#define ENUM_INFO_VARIABLE " << prefix << enumName << "_Heimdallr_EnumInfo" << "\n";
+			os << "#define ENUM_INFO_REGISTER_VARIABLE " << prefix << enumName << "_Heimdallr_EnumInfo_Register" << "\n";
 			os << "#define ENUM_STORAGE_VARIABLE " << prefix << enumName << "_Heimdallr_EnumStorage" << "\n";
 			os << "namespace hmdl" << "\n";
 			os << "{" << "\n";
@@ -731,7 +743,9 @@ void ReflectedEnum::Generate(clang::ASTContext* ctx, llvm::raw_ostream& os)
 			os << "} // namespace hmdl" << "\n";
 			os << "#undef ENUM_TYPE" << "\n";
 			os << "#undef ENUM_COUNT" << "\n";
+			os << "#undef ENUM_DEFAULT_VALUE_VARIABLE" << "\n";
 			os << "#undef ENUM_INFO_VARIABLE" << "\n";
+			os << "#undef ENUM_INFO_REGISTER_VARIABLE" << "\n";
 			os << "#undef ENUM_STORAGE_VARIABLE" << "\n";
 
 		}
@@ -839,12 +853,15 @@ void ReflectedEnum::GenerateEnum(clang::ASTContext* ctx, llvm::raw_ostream& os)
 			os << "\n";
 
 			std::string ownerClass = Utils::GetScopeName(clang::dyn_cast<clang::CXXRecordDecl>(m_EnumDecl->getParent()));
+			os << "inline ENUM_TYPE ENUM_DEFAULT_VALUE_VARIABLE = {};" << "\n";
 			os << "inline EnumInfo ENUM_INFO_VARIABLE" << "\n";
 			os << "{" << "\n";
 			os << "TypeInfo::InvalidID," << "\n";
 			os << "\"" << enumName << "\"," << "\n";
 			os << "\"" << Utils::GetFullScopeNamePrefix(m_EnumDecl->getParent()) << enumName << "\"," << "\n";
 			os << "sizeof(ENUM_TYPE)," << "\n";
+			os << "alignof(ENUM_TYPE)," << "\n";
+			os << "&ENUM_DEFAULT_VALUE_VARIABLE," << "\n";
 			os << "ENUM_STORAGE_VARIABLE.m_Strings.data()," << "\n";
 			os << "ENUM_COUNT," << "\n";
 			os << (ownerClass.empty() ? "nullptr," : ("GetType<" + ownerClass + ">(),")) << "\n";
@@ -855,16 +872,17 @@ void ReflectedEnum::GenerateEnum(clang::ASTContext* ctx, llvm::raw_ostream& os)
 			os << "ENUM_STORAGE_VARIABLE.m_Attributes," << "\n";
 			os << "};" << "\n";
 			os << "\n";
+			os << "inline hmdl::__internal__::registry::RegisterHelper ENUM_INFO_REGISTER_VARIABLE(&ENUM_INFO_VARIABLE);" << "\n";
 		}
 		os << "} // anonymous namespace" << "\n";
 
-		os << "template <> const TypeInfo* GetTypeImpl(TemplatedTag<ENUM_TYPE>) noexcept" << "\n";
+		os << "template<> const TypeInfo* GetTypeImpl(TemplatedTag<ENUM_TYPE>) noexcept" << "\n";
 		os << "{" << "\n";
 		os << "return GetEnum<ENUM_TYPE>();" << "\n";
 		os << "}" << "\n";
 		os << "\n";
 
-		os << "template <> const EnumInfo* GetEnumImpl(TemplatedTag<ENUM_TYPE>) noexcept" << "\n";
+		os << "template<> const EnumInfo* GetEnumImpl(TemplatedTag<ENUM_TYPE>) noexcept" << "\n";
 		os << "{" << "\n";
 		os << "return &ENUM_INFO_VARIABLE;" << "\n";
 		os << "}" << "\n";
@@ -884,8 +902,8 @@ void ReflectedEnum::GenerateEnum(clang::ASTContext* ctx, llvm::raw_ostream& os)
 	}
 	os << "} // __internal__" << "\n";
 
-	os << "template <> ENUM_TYPE* EnumRange<ENUM_TYPE>::begin() const { return ENUM_COUNT > 0 ? &__internal__::ENUM_STORAGE_VARIABLE.m_Values[0] : nullptr; };" << "\n";
-	os << "template <> ENUM_TYPE* EnumRange<ENUM_TYPE>::end() const { return ENUM_COUNT > 0 ? &__internal__::ENUM_STORAGE_VARIABLE.m_Values[0] + ENUM_COUNT : nullptr; };" << "\n";
+	os << "template<> ENUM_TYPE* EnumRange<ENUM_TYPE>::begin() const { return ENUM_COUNT > 0 ? &__internal__::ENUM_STORAGE_VARIABLE.m_Values[0] : nullptr; };" << "\n";
+	os << "template<> ENUM_TYPE* EnumRange<ENUM_TYPE>::end() const { return ENUM_COUNT > 0 ? &__internal__::ENUM_STORAGE_VARIABLE.m_Values[0] + ENUM_COUNT : nullptr; };" << "\n";
 	os << "\n";
 
 }
@@ -951,7 +969,6 @@ std::string Utils::GetAttributes(const clang::Decl* decl)
 		notes = "";
 	}
 
-	//printf("%s\n", notes.c_str());
 	return notes;
 }
 
@@ -968,10 +985,6 @@ std::vector<std::string> Utils::GetAttributesList(const clang::Decl* decl)
 
 	for (auto it = begin; it != end; ++it) {
 		result.push_back(*it);
-	}
-
-	for (const std::string& item : result) {
-		printf("%s\n", item.c_str());
 	}
 
 	return result;

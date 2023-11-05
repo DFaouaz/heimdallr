@@ -5,6 +5,7 @@
 #include "PropertyInfo.h"
 #include "FunctionInfo.h"
 #include "EnumInfo.h"
+#include "MetaObject.h"
 #include "Attribute.h"
 
 #include <string>
@@ -31,7 +32,7 @@ __attribute__((annotate(_HEIMDALLR_REFLECTION_ANNOTATION_ #__VA_ARGS__)))
 #define HEIMDALLR_CLASS(...)		_REFLECT_(__VA_ARGS__)
 #define HEIMDALLR_STRUCT(...)		_REFLECT_(__VA_ARGS__)
 #define HEIMDALLR_PROPERTY(...)		_REFLECT_(__VA_ARGS__)
-#define HEIMDALLR_FUNCTION(...)		template<typename Func> friend struct hmdl::__internal__::FunctionInvoker; \
+#define HEIMDALLR_FUNCTION(...)		template<typename T, typename Func, size_t Index> friend struct hmdl::__internal__::FunctionInvoker; \
 									_REFLECT_(__VA_ARGS__)
 #define HEIMDALLR_ENUM(...)			_REFLECT_(__VA_ARGS__)
 #endif
@@ -115,11 +116,8 @@ namespace hmdl
 			// todo: Qualifiers
 		};
 
-		template<typename Func>
-		struct FunctionInvoker
-		{
-			constexpr static Func Invoke;
-		};
+		template<typename T, typename Func, size_t Index>
+		struct FunctionInvoker {};
 
 		template<typename T>
 		struct TemplatedTag {};
@@ -138,16 +136,90 @@ namespace hmdl
 
 		template<typename Enum>
 		extern Enum StringToEnumImpl(TemplatedTag<Enum>, const char* str) noexcept;
+
+		namespace registry
+		{
+			inline std::set<const TypeInfo*> s_AllTypeInfo;
+			inline std::unordered_map<const char*, const TypeInfo*> s_NameToTypeInfo;
+			inline std::unordered_map<const char*, const TypeInfo*> s_FullNameToTypeInfo;
+
+			inline std::set<const ClassInfo*> s_AllClassInfo;
+			inline std::unordered_map<const char*, const ClassInfo*> s_NameToClassInfo;
+			inline std::unordered_map<const char*, const ClassInfo*> s_FullNameToClassInfo;
+
+			inline std::set<const EnumInfo*> s_AllEnumInfo;
+			inline std::unordered_map<const char*, const EnumInfo*> s_NameToEnumInfo;
+			inline std::unordered_map<const char*, const EnumInfo*> s_FullNameToEnumInfo;
+
+			inline void Register(const TypeInfo* typeInfo)
+			{
+				if (s_AllTypeInfo.find(typeInfo) != s_AllTypeInfo.end()) return;
+
+				s_AllTypeInfo.insert(typeInfo);
+				s_NameToTypeInfo[typeInfo->GetName()] = typeInfo;
+				s_FullNameToTypeInfo[typeInfo->GetFullName()] = typeInfo;
+			}
+
+			inline void Register(const ClassInfo* classInfo)
+			{
+				const TypeInfo* typeInfo = classInfo;
+				Register(typeInfo);
+
+				if (s_AllClassInfo.find(classInfo) != s_AllClassInfo.end()) return;
+
+				s_AllClassInfo.insert(classInfo);
+				s_NameToClassInfo[classInfo->GetName()] = classInfo;
+				s_FullNameToClassInfo[classInfo->GetFullName()] = classInfo;
+			}
+
+			inline void Register(const EnumInfo* enumInfo)
+			{
+				const TypeInfo* typeInfo = enumInfo;
+				Register(typeInfo);
+
+				if (s_AllEnumInfo.find(enumInfo) != s_AllEnumInfo.end()) return;
+
+				s_AllEnumInfo.insert(enumInfo);
+				s_NameToEnumInfo[enumInfo->GetName()] = enumInfo;
+				s_FullNameToEnumInfo[enumInfo->GetFullName()] = enumInfo;
+			}
+
+			struct RegisterHelper
+			{
+				RegisterHelper(const ClassInfo* classInfo)
+				{
+					hmdl::__internal__::registry::Register(classInfo);
+				}
+
+				RegisterHelper(const TypeInfo* typeInfo)
+				{
+					hmdl::__internal__::registry::Register(typeInfo);
+				}
+
+				RegisterHelper(const EnumInfo* enumInfo)
+				{
+					hmdl::__internal__::registry::Register(enumInfo);
+				}
+			};
+
+		}
 	}
 
-	template<typename Enum>
-	struct EnumRange
+	inline const ClassInfo* GetClass(const char* name) noexcept
 	{
-		static_assert(std::is_enum<Enum>::value, "EnumRange only admits enum o enum classes");
+		using namespace __internal__;
+		if (registry::s_FullNameToClassInfo.find(name) != registry::s_FullNameToClassInfo.end())
+		{
+			return registry::s_FullNameToClassInfo[name];
+		}
 
-		Enum* begin() const;
-		Enum* end() const;
-	};
+		if (registry::s_NameToClassInfo.find(name) != registry::s_NameToClassInfo.end())
+		{
+			return registry::s_NameToClassInfo[name];
+		}
+
+		return nullptr;
+	}
 
 	template<typename T>
 	inline const ClassInfo* GetClass() noexcept
@@ -155,10 +227,42 @@ namespace hmdl
 		return __internal__::GetClassImpl(__internal__::TemplatedTag<T>{});
 	}
 
+	inline const TypeInfo* GetType(const char* name) noexcept
+	{
+		using namespace __internal__;
+		if (registry::s_FullNameToTypeInfo.find(name) != registry::s_FullNameToTypeInfo.end())
+		{
+			return registry::s_FullNameToTypeInfo[name];
+		}
+
+		if (registry::s_NameToTypeInfo.find(name) != registry::s_NameToTypeInfo.end())
+		{
+			return registry::s_NameToTypeInfo[name];
+		}
+
+		return nullptr;
+	}
+
 	template<typename T>
 	inline const TypeInfo* GetType() noexcept
 	{
 		return __internal__::GetTypeImpl(__internal__::TemplatedTag<T>{});
+	}
+
+	inline const EnumInfo* GetEnum(const char* name) noexcept
+	{
+		using namespace __internal__;
+		if (registry::s_FullNameToEnumInfo.find(name) != registry::s_FullNameToEnumInfo.end())
+		{
+			return registry::s_FullNameToEnumInfo[name];
+		}
+
+		if (registry::s_NameToEnumInfo.find(name) != registry::s_NameToEnumInfo.end())
+		{
+			return registry::s_NameToEnumInfo[name];
+		}
+
+		return nullptr;
 	}
 
 	template<typename T>
@@ -179,34 +283,44 @@ namespace hmdl
 		return __internal__::StringToEnumImpl(__internal__::TemplatedTag<Enum>{}, str);
 	}
 
+	template<typename Enum>
+	struct EnumRange
+	{
+		static_assert(std::is_enum<Enum>::value, "EnumRange only admits enum o enum classes");
+
+		Enum* begin() const;
+		Enum* end() const;
+	};
+
+
 #ifndef _HEIMDALLR_PRIMITIVE_TYPES_
 #define _HEIMDALLR_PRIMITIVE_TYPES_
 
 	// set primitive definitions
 #define TYPES                                       \
-    X(bool, Bool, "%d")                             \
-    X(char, Char, "%d")                             \
-    X(short, Short, "%d")                           \
-    X(int, Int, "%d")                               \
-    X(long, Long, "%ld")                            \
-    X(long long, LongLong, "%lld")                  \
-    X(float, Float, "%.9g")                         \
-    X(double, Double, "%.17g")                      \
-    X(long double, LongDouble, "%.21Lg")            \
-    X(unsigned char, UnsignedChar, "%u")            \
-    X(unsigned short, UnsignedShort, "%u")          \
-    X(unsigned int, UnsignedInt, "%u")              \
-    X(unsigned long, UnsignedLong, "%lu")           \
-    X(unsigned long long, UnsignedLongLong, "%llu") \
-    X(std::string, String, "%s")                    \
+    X(bool, bool, "%d")                             \
+    X(char, char, "%d")                             \
+    X(short, short, "%d")                           \
+    X(int, int, "%d")                               \
+    X(long, long, "%ld")                            \
+    X(long long, long_long, "%lld")                  \
+    X(float, float, "%.9g")                         \
+    X(double, double, "%.17g")                      \
+    X(long double, long_double, "%.21Lg")            \
+    X(unsigned char, unsigned_char, "%u")            \
+    X(unsigned short, unsigned_short, "%u")          \
+    X(unsigned int, unsigned_int, "%u")              \
+    X(unsigned long, unsigned_long, "%lu")           \
+    X(unsigned long long, unsigned_long_long, "%llu") \
 
 #define X(Type, Name, Format) \
-	template <> inline const TypeInfo* GetTypeImpl(TemplatedTag<Type>) noexcept \
+	inline Type Name##_Heimdallrs_Type_DefaultValue = (Type)0;\
+	inline TypeInfo Name##_Heimdallr_TypeInfo(TypeInfo::InvalidID, #Type, #Type, sizeof(Type), alignof(Type), &Name##_Heimdallrs_Type_DefaultValue); \
+	inline registry::RegisterHelper Name##_Heimdallr_TypeInfo_Register(&Name##_Heimdallr_TypeInfo); \
+	template<> inline const TypeInfo* GetTypeImpl(TemplatedTag<Type>) noexcept \
 	{ \
-		struct Name : public TypeInfo { Name(uint64_t id, const char* name, const char* fullname, size_t size) : TypeInfo({ id, name, fullname, size }) {}; }; \
-		static Name type(TypeInfo::InvalidID, #Type, #Type, sizeof(Type)); \
-		return &type; \
-	}\
+		return &Name##_Heimdallr_TypeInfo; \
+	} \
 
 	namespace __internal__
 	{
@@ -214,11 +328,20 @@ namespace hmdl
 #undef X
 
 		// definitions of void type (as it is a special type)
-		template <> inline const TypeInfo* GetTypeImpl(TemplatedTag<void>) noexcept
+		inline TypeInfo void_Heimdallr_TypeInfo(TypeInfo::InvalidID, "void", "void", 0, 0, nullptr);
+		inline registry::RegisterHelper void_Heimdallr_TypeInfo_Register(&void_Heimdallr_TypeInfo);
+		template<> inline const TypeInfo* GetTypeImpl(TemplatedTag<void>) noexcept
 		{
-			struct Void : public TypeInfo { Void(uint64_t id, const char* name, const char* fullname, size_t size) : TypeInfo({ id, name, fullname, size }) {}; };
-			static Void type(TypeInfo::InvalidID, "void", "void", 0);
-			return &type;
+			return &void_Heimdallr_TypeInfo;
+		}
+
+		// definitions of string type (as it is a special type)
+		inline std::string std_string_Heimdallrs_Type_DefaultValue = "";
+		inline TypeInfo std_string_Heimdallr_TypeInfo(TypeInfo::InvalidID, "string", "std::string", sizeof(std::string), alignof(std::string), &std_string_Heimdallrs_Type_DefaultValue);
+		inline registry::RegisterHelper std_string_Heimdallr_TypeInfo_Register(&std_string_Heimdallr_TypeInfo);
+		template<> inline const TypeInfo* GetTypeImpl(TemplatedTag<std::string>) noexcept
+		{
+			return &std_string_Heimdallr_TypeInfo;
 		}
 	}
 

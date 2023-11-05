@@ -69,7 +69,7 @@ public:
 		MyNameSpace::TestStruct jaat[5];
 
 	HEIMDALLR_PROPERTY()
-		bool nnoasd[8] = { true , false , false , true, false, false , true, false };
+		bool nnoasd[8] = { true, false, false, true, false, false, true, false };
 
 	HEIMDALLR_PROPERTY()
 		int count;
@@ -96,6 +96,12 @@ private:
 		return false;
 	}
 
+	HEIMDALLR_FUNCTION(Category = "Hola a todos", HideInEditor)
+	inline bool MyFunctionWithNameXYZ(char c, bool isAwaken) const
+	{
+		return false;
+	}
+
 	HEIMDALLR_FUNCTION(Category = "Hola a nadie", HideInEditor)
 	inline bool MyFunctionWithNameX(char c, int a) const
 	{
@@ -103,13 +109,13 @@ private:
 	}
 
 	HEIMDALLR_FUNCTION()
-		void MyVoidFunction(char c) const
+	void MyVoidFunction(char c) const
 	{
 		printf("Printing a void function\n");
 	}
 
 	HEIMDALLR_FUNCTION()
-		int PrintXReturnY(int X, int Y) const
+	int PrintXReturnY(int X, int Y) const
 	{
 		printf("Printing X = %d\n", X);
 		return Y;

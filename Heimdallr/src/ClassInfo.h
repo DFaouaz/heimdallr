@@ -16,6 +16,8 @@ namespace hmdl
 			const char* name,
 			const char* fullname,
 			size_t size,
+			size_t alignment,
+			const void* defaultValue,
 			const ClassInfo** parentClassesArr,
 			size_t parentClassesSize,
 			const PropertyInfo* fieldsArr,
@@ -23,7 +25,7 @@ namespace hmdl
 			const FunctionInfo* functionsArr,
 			size_t functionSize,
 			const std::vector<const IAttribute*>& attrs) :
-			TypeInfo({ id, name, fullname, size }),
+			TypeInfo({ id, name, fullname, size, alignment, defaultValue }),
 			m_ParentClasses(parentClassesArr),
 			m_ParentClassesSize(parentClassesSize),
 			m_Fields(fieldsArr),
@@ -33,7 +35,7 @@ namespace hmdl
 			IAttributeHolder({ attrs })
 		{};
 
-		inline const ClassInfo** GetParentClasses() const { return m_ParentClasses; }
+		inline const ClassInfo** GetParentClasses() const { return m_ParentClasses; };
 		inline size_t GetParentClassesCount() const { return m_ParentClassesSize; };
 		inline const PropertyInfo* GetFields() const { return m_Fields; };
 		inline size_t GetFieldsCount() const { return m_FieldsSize; };
@@ -44,10 +46,19 @@ namespace hmdl
 		{
 			if (m_Fields == nullptr) return nullptr;
 
-			for (int i = 0; i < m_FieldsSize; ++i)
+			for (size_t i = 0; i < m_FieldsSize; ++i)
 			{
 				if (m_Fields[i].GetName() == name)
 					return &m_Fields[i];
+			}
+
+			// check in parent classes
+			for (size_t i = 0; i < m_ParentClassesSize; ++i)
+			{
+				if (const PropertyInfo* pInfo = m_ParentClasses[i]->GetField(name))
+				{
+					return pInfo;
+				}
 			}
 
 			return nullptr;
@@ -61,6 +72,15 @@ namespace hmdl
 			{
 				if (m_Functions[i].GetName() == name)
 					return &m_Functions[i];
+			}
+
+			// check in parent classes
+			for (size_t i = 0; i < m_ParentClassesSize; ++i)
+			{
+				if (const FunctionInfo* fInfo = m_ParentClasses[i]->GetMethod(name))
+				{
+					return fInfo;
+				}
 			}
 
 			return nullptr;

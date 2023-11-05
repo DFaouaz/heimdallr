@@ -16,6 +16,8 @@ namespace hmdl
 			const char* name,
 			const char* fullname,
 			size_t size,
+			size_t alignment,
+			const void* defaultValue,
 			const char** values,
 			size_t count,
 			const TypeInfo* owner,
@@ -24,7 +26,7 @@ namespace hmdl
 			std::function<void()>* enumToStringFunc,
 			std::function<void()>* stringToEnumFunc,
 			const std::vector<const IAttribute*>& attrs) :
-			TypeInfo({ id, name, fullname, size }),
+			TypeInfo({ id, name, fullname, size, alignment, defaultValue }),
 			m_Values(values),
 			m_Count(count),
 			m_OwnerType(owner),
@@ -81,7 +83,7 @@ namespace hmdl
 		template<typename Enum>
 		inline const char* GetStringByValue(Enum value) const
 		{
-			static_assert(std::is_enum<Enum>::value, "GetStringByValue() should used with an enum or enum class!");
+			static_assert(std::is_enum<Enum>::value, "GetStringByValue() should be used with an enum or enum class!");
 			assert(m_EnumToStringFunc != nullptr && "EnumInfo enum to string function pointer is null");
 
 			std::function<const char*(Enum)>* func = reinterpret_cast<std::function<const char*(Enum)>*>(m_EnumToStringFunc);
@@ -91,7 +93,7 @@ namespace hmdl
 		template<typename Enum>
 		inline bool TryGetStringByValue(Enum value, const char*& outResult) const
 		{
-			static_assert(std::is_enum<Enum>::value, "GetStringByValue() should used with an enum or enum class!");
+			static_assert(std::is_enum<Enum>::value, "GetStringByValue() should be used with an enum or enum class!");
 			if (m_EnumToStringFunc == nullptr) return false;
 
 			std::function<const char* (Enum)>* func = reinterpret_cast<std::function<const char* (Enum)>*>(m_EnumToStringFunc);

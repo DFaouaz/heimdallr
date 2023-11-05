@@ -35,8 +35,8 @@ namespace hmdl
 		inline size_t GetParametersSize() const { return m_ParametersSize; };
 		inline void SetParameters(const PropertyInfo* params, size_t size) { m_Parameters = params; m_ParametersSize = size; };
 		inline void SetInvokeFuncPtr(std::function<void()>* invokeFuncPtr) { m_InvokeFuncPtr = invokeFuncPtr; };
-
-		template<typename ReturnType, typename ...Args>
+		
+		template<typename ReturnType = void, typename ...Args>
 		ReturnType Invoke(void* const obj, Args... args) const
 		{
 			std::function<ReturnType(void*, Args...)>& func =

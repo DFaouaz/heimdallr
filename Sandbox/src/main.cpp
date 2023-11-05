@@ -269,5 +269,24 @@ int main()
 {
 	Tests::Enum::Test();
 
+	const hmdl::ClassInfo* cInfo = hmdl::GetClass("TestClass");
+	const hmdl::TypeInfo* tInfo = hmdl::GetType("string");
+	const hmdl::EnumInfo* eInfo = hmdl::GetEnum("MyCXXEnum");
+	auto func = cInfo->GetMethod("MyFunctionWithNameX");
+	
+
+	hmdl::MetaObject metaObject = cInfo->ConstructDefault();
+	TestClass& a = metaObject.GetAs<TestClass>();
+	const hmdl::PropertyInfo* pInfo = cInfo->GetField("nunuName");
+	pInfo->SetValue(metaObject, std::string("HolaCaracola"));
+	hmdl::MetaObject metaObject2 = metaObject;
+	pInfo = cInfo->GetField("c");
+	pInfo->SetValue(metaObject, 'h');
+
+	TestClass& b = metaObject2.GetAs<TestClass>();
+	printf("%s", a.nunuName.c_str());
+	printf("%c", a.c);
+	func->Invoke(&a, 'c', 8);
+
 	return 0;
 }
