@@ -19,21 +19,25 @@ namespace hmdl
 			size_t alignment,
 			const void* defaultValue,
 			const char** values,
+			const char** comments,
 			size_t count,
 			const TypeInfo* owner,
 			std::function<const char* (void*)>* valueAddrToStringFunc,
 			std::function<bool(const char*)>* stringEnumExistsFunc,
 			std::function<void()>* enumToStringFunc,
 			std::function<void()>* stringToEnumFunc,
+			const char* comment,
 			const std::vector<const IAttribute*>& attrs) :
 			TypeInfo({ id, name, fullname, size, alignment, defaultValue }),
 			m_Values(values),
+			m_Comments(comments),
 			m_Count(count),
 			m_OwnerType(owner),
 			m_ValueAddrToStringFunc(valueAddrToStringFunc),
 			m_StringEnumExistsFunc(stringEnumExistsFunc),
 			m_EnumToStringFunc(enumToStringFunc),
 			m_StringToEnumFunc(stringToEnumFunc),
+			m_Comment(comment),
 			IAttributeHolder({ attrs })
 		{
 		};
@@ -42,8 +46,14 @@ namespace hmdl
 		/** Get values of the enum as strings */
 		inline const char** GetValues() const { return m_Values; };
 
-		/** Get value of the enum as string given a index */
+		/** Get value of the enum as string given an index */
 		inline const char* GetValue(size_t index) const { assert(index >= 0 && index < m_Count); return m_Values[index]; };
+
+		/** Get comments of the enum */
+		inline const char** GetValueComments() const { return m_Comments; };
+
+		/** Get comment of the enum given an index */
+		inline const char* GetValueComment(size_t index) const { assert(index >= 0 && index < m_Count); return m_Comments[index]; };
 
 		/** Get the size in bytes of the enum */
 		inline size_t GetCount() const { return m_Count; };
@@ -108,9 +118,15 @@ namespace hmdl
 			return (*m_ValueAddrToStringFunc)(valueAddr);
 		};
 
+		/** Get comment of the enum declaration */
+		inline const char* GetComment() const { return m_Comment; };
+
 	private:
 		/** Values of the enum as strings */
 		const char** m_Values;
+
+		/** Comments of the enum as strings */
+		const char** m_Comments;
 
 		/** Number of members in the enum */
 		size_t m_Count;
@@ -129,6 +145,9 @@ namespace hmdl
 
 		/** Function pointer used to convert a string to a string value */
 		std::function<void()>* m_StringToEnumFunc;
+
+		/** Comment associated to the enum declaration */
+		const char* m_Comment;
 	};
 
 }

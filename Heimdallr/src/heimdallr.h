@@ -48,10 +48,12 @@ namespace hmdl
 
 			template<typename Lambda>
 			ClassStorage(Lambda&& ctr) noexcept :
+				m_ParentClasses(),
 				m_Fields(),
 				m_Functions(),
 				m_TemplateArgs(),
-				m_Attributes()
+				m_Attributes(),
+				m_Comment(nullptr)
 			{
 				ctr(this);
 			};
@@ -66,6 +68,7 @@ namespace hmdl
 			std::array<FunctionInfo, NFunctions> m_Functions;
 			std::array<PropertyInfo, NTemplateArgs> m_TemplateArgs; // todo: do something with this (maybe)
 			std::vector<const IAttribute*> m_Attributes;
+			const char* m_Comment;
 		};
 
 		template<typename Enum, size_t N>
@@ -77,15 +80,18 @@ namespace hmdl
 			EnumStorage(Lambda&& ctr) noexcept :
 				m_Values(),
 				m_Strings(),
+				m_Comments(),
 				m_ValueToString(),
 				m_StringToValue(),
-				m_Attributes()
+				m_Attributes(),
+				m_Comment(nullptr)
 			{
 				ctr(this);
 			};
 
 			std::array<Enum, N> m_Values;
 			std::array<const char*, N> m_Strings;
+			std::array<const char*, N> m_Comments;
 			std::unordered_map<Enum, const char*> m_ValueToString;
 			std::unordered_map<const char*, Enum> m_StringToValue;
 
@@ -94,6 +100,8 @@ namespace hmdl
 			std::function<const char* (Enum)> m_EnumToStringFunc;
 			std::function<Enum(const char*)> m_StringToEnumFunc;
 			std::vector<const IAttribute*> m_Attributes;
+			const char* m_Comment;
+
 		};
 
 		template<size_t NParams, typename ReturnType, typename ...Args>
@@ -104,7 +112,10 @@ namespace hmdl
 				m_Name(nullptr),
 				m_ReturnType(nullptr),
 				m_Parameters(),
-				m_InvokeFunc()
+				m_InvokeFunc(),
+				m_Attributes(),
+				m_Comment(nullptr),
+				m_ReturnComment(nullptr)
 			{
 				ctr(this);
 			};
@@ -113,6 +124,10 @@ namespace hmdl
 			const TypeInfo* m_ReturnType;
 			std::array<PropertyInfo, NParams> m_Parameters;
 			std::function<ReturnType(void*, Args...)> m_InvokeFunc;
+
+			std::vector<const IAttribute*> m_Attributes;
+			const char* m_Comment;
+			const char* m_ReturnComment;
 			// todo: Qualifiers
 		};
 
@@ -297,25 +312,25 @@ namespace hmdl
 #define _HEIMDALLR_PRIMITIVE_TYPES_
 
 	// set primitive definitions
-#define TYPES                                       \
-    X(bool, bool, "%d")                             \
-    X(char, char, "%d")                             \
-    X(short, short, "%d")                           \
-    X(int, int, "%d")                               \
-    X(long, long, "%ld")                            \
-    X(long long, long_long, "%lld")                  \
-    X(float, float, "%.9g")                         \
-    X(double, double, "%.17g")                      \
-    X(long double, long_double, "%.21Lg")            \
-    X(unsigned char, unsigned_char, "%u")            \
-    X(unsigned short, unsigned_short, "%u")          \
-    X(unsigned int, unsigned_int, "%u")              \
-    X(unsigned long, unsigned_long, "%lu")           \
-    X(unsigned long long, unsigned_long_long, "%llu") \
+#define TYPES                                            \
+    X(bool, bool, "%d")                                  \
+    X(char, char, "%d")                                  \
+    X(short, short, "%d")                                \
+    X(int, int, "%d")                                    \
+    X(long, long, "%ld")                                 \
+    X(long long, long_long, "%lld")                      \
+    X(float, float, "%.9g")                              \
+    X(double, double, "%.17g")                           \
+    X(long double, long_double, "%.21Lg")                \
+    X(unsigned char, unsigned_char, "%u")                \
+    X(unsigned short, unsigned_short, "%u")              \
+    X(unsigned int, unsigned_int, "%u")                  \
+    X(unsigned long, unsigned_long, "%lu")               \
+    X(unsigned long long, unsigned_long_long, "%llu")    \
 
 #define X(Type, Name, Format) \
-	inline Type Name##_Heimdallrs_Type_DefaultValue = (Type)0;\
-	inline TypeInfo Name##_Heimdallr_TypeInfo(TypeInfo::InvalidID, #Type, #Type, sizeof(Type), alignof(Type), &Name##_Heimdallrs_Type_DefaultValue); \
+	inline Type Name##_Heimdallr_Type_DefaultValue = (Type)0;\
+	inline TypeInfo Name##_Heimdallr_TypeInfo(TypeInfo::InvalidID, #Type, #Type, sizeof(Type), alignof(Type), &Name##_Heimdallr_Type_DefaultValue); \
 	inline registry::RegisterHelper Name##_Heimdallr_TypeInfo_Register(&Name##_Heimdallr_TypeInfo); \
 	template<> inline const TypeInfo* GetTypeImpl(TemplatedTag<Type>) noexcept \
 	{ \

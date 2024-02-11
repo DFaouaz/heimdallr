@@ -4,6 +4,7 @@
 #include "ClassFinder.h"
 #include <clang/Tooling/Tooling.h>
 #include "clang/AST/Decl.h"
+#include <clang/AST/Comment.h>
 #include <filesystem>
 #include <regex>
 
@@ -239,6 +240,7 @@ void ReflectedClass::GenerateClass(clang::ASTContext* ctx, llvm::raw_ostream& os
 			os << "CLASS_STORAGE_VARIABLE.FieldsCount," << "\n";
 			os << "CLASS_STORAGE_VARIABLE.m_Functions.data()," << "\n";
 			os << "CLASS_STORAGE_VARIABLE.FunctionsCount," << "\n";
+			os << "CLASS_STORAGE_VARIABLE.m_Comment," << "\n";
 			os << "CLASS_STORAGE_VARIABLE.m_Attributes" << "\n";
 			os << "};" << "\n";
 			os << "\n";
@@ -283,6 +285,8 @@ void ReflectedClass::GenerateClassStorageBody(clang::ASTContext* ctx, llvm::raw_
 	for (int i = 0; i < m_Fields.size(); ++i)
 	{
 		const clang::FieldDecl* fieldDecl = m_Fields[i];
+		if (fieldDecl->isInvalidDecl()) continue;
+
 		std::string fieldType = GetDesugaredType(ctx, fieldDecl->getType()).getAsString(m_PrintingPolicy);
 		fieldType = Utils::RemoveAnonymousTag(fieldType);
 		os << "// property \"" << fieldDecl->getType().getAsString(m_PrintingPolicy) << " " << fieldDecl->getName().str() << "\"" << "\n";
@@ -303,6 +307,10 @@ void ReflectedClass::GenerateClassStorageBody(clang::ASTContext* ctx, llvm::raw_
 		{
 			os << "self->m_Fields[" << std::to_string(i) << "].SetArraySize(0);" << "\n";
 		}
+
+		// field comment
+		os << "self->m_Fields[" << std::to_string(i) << "].SetComment(\"" << Utils::GetCommentForDecl(fieldDecl) << "\");" << "\n";
+
 		{	// attributes
 			int index = 0;
 			std::vector<std::string> attrs = Utils::GetAttributesList(fieldDecl);
@@ -339,6 +347,8 @@ void ReflectedClass::GenerateClassStorageBody(clang::ASTContext* ctx, llvm::raw_
 		os << "self->m_Functions[" << std::to_string(i) << "].SetReturnType(FUNCTION_STORAGE_VARIABLE" << std::to_string(i) << ".m_ReturnType);" << "\n";
 		os << "self->m_Functions[" << std::to_string(i) << "].SetParameters(FUNCTION_STORAGE_VARIABLE" << std::to_string(i) << ".m_Parameters.data(), " << "FUNCTION_STORAGE_VARIABLE" << std::to_string(i) << ".m_Parameters.size());" << "\n";
 		os << "self->m_Functions[" << std::to_string(i) << "].SetInvokeFuncPtr((std::function<void()>*)&FUNCTION_STORAGE_VARIABLE" << std::to_string(i) << ".m_InvokeFunc);" << "\n";
+		os << "self->m_Functions[" << std::to_string(i) << "].SetComment(FUNCTION_STORAGE_VARIABLE" << std::to_string(i) << ".m_Comment);" << "\n";
+		os << "self->m_Functions[" << std::to_string(i) << "].SetReturnComment(FUNCTION_STORAGE_VARIABLE" << std::to_string(i) << ".m_ReturnComment);" << "\n";
 
 		{	// attributes
 			int index = 0;
@@ -369,6 +379,8 @@ void ReflectedClass::GenerateClassStorageBody(clang::ASTContext* ctx, llvm::raw_
 
 		}
 	}
+	// class comment
+	os << "self->m_Comment = \"" << Utils::GetCommentForDecl(m_Record) <<"\";" << "\n";
 
 	{	// class attributes
 		int index = 0;
@@ -397,7 +409,6 @@ void ReflectedClass::GenerateClassStorageBody(clang::ASTContext* ctx, llvm::raw_
 			os << "static_assert(" << attr.first << "::CanAllowMultiple() || " << std::to_string(attr.second) << " == 1, \"Cannot have multiple attributes of type " << attr.first << "\");" << "\n";
 		}
 	}
-
 }
 
 void ReflectedClass::GenerateFunction(clang::ASTContext* ctx, llvm::raw_ostream& os, int index)
@@ -471,6 +482,7 @@ void ReflectedClass::GenerateFunctionStorageBody(clang::ASTContext* ctx, llvm::r
 		{
 			os << "self->m_Parameters[" << std::to_string(i) << "].SetArraySize(0);" << "\n";
 		}
+			os << "self->m_Parameters[" << std::to_string(i) << "].SetComment(\"" << Utils::GetCommentForFunctionParam(m_Functions[index], i) << "\");" << "\n";
 		os << "\n";
 	}
 
@@ -483,6 +495,39 @@ void ReflectedClass::GenerateFunctionStorageBody(clang::ASTContext* ctx, llvm::r
 
 	os << "self->m_InvokeFunc = FunctionLambda;" << "\n";
 	os << "\n";
+
+	// function comment
+	os << "self->m_Comment = \"" << Utils::GetCommentForDecl(m_Functions[index]) << "\";" << "\n";
+	os << "self->m_ReturnComment = \"" << Utils::GetCommentForFunctionReturn(m_Functions[index]) << "\";" << "\n";
+
+	// attributes
+	{	
+		int index = 0;
+		std::vector<std::string> attrs = Utils::GetAttributesList(m_Functions[index]);
+		std::unordered_map<std::string, size_t> attrNameToCount;
+		for (const std::string& attr : attrs)
+		{
+			auto pair = Utils::GetParsedAttribute(attr);
+			std::string attrType = pair.first;
+			std::string attrArgs = pair.second;
+			std::string attrName = m_Functions[index]->getName().str() + "_func" + std::to_string(index) + "_attr" + std::to_string(index);
+			os << "static " << attrType << " " << attrName << " = { " << attrArgs << " };" << "\n";
+			os << "self->m_Attributes.push_back(&" << attrName << ");" << "\n";
+			++index;
+
+			if (attrNameToCount.find(attrType) == attrNameToCount.end())
+			{
+				attrNameToCount[attrType] = 0;
+			}
+			++attrNameToCount[attrType];
+		}
+
+		// assertion
+		for (auto attr : attrNameToCount)
+		{
+			os << "static_assert(" << attr.first << "::CanAllowMultiple() || " << std::to_string(attr.second) << " == 1, \"Cannot have multiple attributes of type " << attr.first << "\");" << "\n";
+		}
+	}
 }
 
 std::string ReflectedClass::GetFunctionStorageTemplateParamsString(int index)
@@ -783,6 +828,14 @@ void ReflectedEnum::GenerateEnum(clang::ASTContext* ctx, llvm::raw_ostream& os)
 					++index;
 				}
 			}
+			{ // comments
+				int index = 0;
+				for (const clang::EnumConstantDecl* decl : m_EnumDecl->enumerators())
+				{
+					os << "self->m_Comments[" << std::to_string(index) << "] = \"" << Utils::GetCommentForDecl(decl) << "\";" << "\n";
+					++index;
+				}
+			}
 			{ // value to string
 				for (const clang::EnumConstantDecl* decl : m_EnumDecl->enumerators())
 				{
@@ -849,6 +902,10 @@ void ReflectedEnum::GenerateEnum(clang::ASTContext* ctx, llvm::raw_ostream& os)
 				}
 
 			}
+			{ // comment
+				os << "self->m_Comment = \"" << Utils::GetCommentForDecl(m_EnumDecl) << "\";" << "\n";
+			}
+
 			os << "});" << "\n";
 			os << "\n";
 
@@ -863,12 +920,14 @@ void ReflectedEnum::GenerateEnum(clang::ASTContext* ctx, llvm::raw_ostream& os)
 			os << "alignof(ENUM_TYPE)," << "\n";
 			os << "&ENUM_DEFAULT_VALUE_VARIABLE," << "\n";
 			os << "ENUM_STORAGE_VARIABLE.m_Strings.data()," << "\n";
+			os << "ENUM_STORAGE_VARIABLE.m_Comments.data()," << "\n";
 			os << "ENUM_COUNT," << "\n";
 			os << (ownerClass.empty() ? "nullptr," : ("GetType<" + ownerClass + ">(),")) << "\n";
 			os << "&ENUM_STORAGE_VARIABLE.m_ValueAddrToStringFunc," << "\n";
 			os << "&ENUM_STORAGE_VARIABLE.m_StringEnumExistsFunc," << "\n";
 			os << "reinterpret_cast<std::function<void()>*>(&ENUM_STORAGE_VARIABLE.m_EnumToStringFunc)," << "\n";
 			os << "reinterpret_cast<std::function<void()>*>(&ENUM_STORAGE_VARIABLE.m_StringToEnumFunc)," << "\n";
+			os << "ENUM_STORAGE_VARIABLE.m_Comment," << "\n";
 			os << "ENUM_STORAGE_VARIABLE.m_Attributes," << "\n";
 			os << "};" << "\n";
 			os << "\n";
@@ -1016,5 +1075,135 @@ std::pair<std::string, std::string> Utils::GetParsedAttribute(const std::string&
 	}
 
 	return { attributeName, attributeArgs };
+}
+
+std::string Utils::GetCommentForDecl(const clang::Decl* decl)
+{
+	std::string commentStr;
+	if (decl == nullptr) return commentStr;
+
+	if (clang::comments::FullComment* fullComment = decl->getASTContext().getCommentForDecl(decl, nullptr))
+	{
+		for (clang::comments::BlockContentComment* block : fullComment->getBlocks())
+		{
+			if (block->getCommentKind() == clang::comments::Comment::CommentKind::ParagraphCommentKind)
+			{
+				clang::comments::ParagraphComment* paragraph = clang::dyn_cast<clang::comments::ParagraphComment>(block);
+				for (clang::comments::Comment::child_iterator it = paragraph->child_begin(); it != paragraph->child_end(); ++it)
+				{
+					clang::comments::TextComment* textComment = clang::dyn_cast<clang::comments::TextComment>(*it);
+					if (textComment == nullptr) continue;
+					if (commentStr.length()) commentStr += "\\n";
+					commentStr += textComment->getText().trim();
+				}
+			}
+			else if (block->getCommentKind() == clang::comments::Comment::CommentKind::ParamCommandCommentKind)
+			{
+				std::string paragraphStr;
+				clang::comments::ParamCommandComment* paramComment = clang::dyn_cast<clang::comments::ParamCommandComment>(block);
+				clang::comments::ParagraphComment* paragraph = paramComment->getParagraph();
+				for (clang::comments::Comment::child_iterator it = paragraph->child_begin(); it != paragraph->child_end(); ++it)
+				{
+					clang::comments::TextComment* textComment = clang::dyn_cast<clang::comments::TextComment>(*it);
+					if (textComment == nullptr) continue;
+					if (paragraphStr.length()) paragraphStr += "\\n";
+					paragraphStr += textComment->getText().trim();
+				}
+
+				std::string paramStr = paramComment->getParamNameAsWritten().str();
+
+				if (commentStr.length()) commentStr += "\\n";
+				std::string commandMarker = paramComment->getCommandMarker() == clang::comments::CMK_Backslash ? "\\" : "@";
+				std::string commandStr = clang::comments::CommandTraits::getBuiltinCommandInfo(paramComment->getCommandID())->Name;
+				commentStr += commandMarker + commandStr + " " + paramStr + " " + paragraphStr;
+			}
+			else if (block->getCommentKind() == clang::comments::Comment::CommentKind::BlockCommandCommentKind)
+			{
+				std::string paragraphStr;
+				clang::comments::BlockCommandComment* blockComment = clang::dyn_cast<clang::comments::BlockCommandComment>(block);
+				clang::comments::ParagraphComment* paragraph = blockComment->getParagraph();
+				for (clang::comments::Comment::child_iterator it = paragraph->child_begin(); it != paragraph->child_end(); ++it)
+				{
+					clang::comments::TextComment* textComment = clang::dyn_cast<clang::comments::TextComment>(*it);
+					if (textComment == nullptr) continue;
+					if (paragraphStr.length()) paragraphStr += "\\n";
+					paragraphStr += textComment->getText().trim();
+				}
+
+				if (commentStr.length()) commentStr += "\\n";
+				std::string commandMarker = blockComment->getCommandMarker() == clang::comments::CMK_Backslash ? "\\" : "@";
+				std::string commandStr = clang::comments::CommandTraits::getBuiltinCommandInfo(blockComment->getCommandID())->Name;
+				commentStr += commandMarker + commandStr + " " + paragraphStr;
+			}
+		}
+	}
+	return commentStr;
+}
+
+std::string Utils::GetCommentForFunctionParam(const clang::FunctionDecl* functionDecl, int32_t paramIndex)
+{
+	std::string commentStr;
+	if (functionDecl == nullptr) return commentStr;
+
+	if (clang::comments::FullComment* fullComment = functionDecl->getASTContext().getCommentForDecl(functionDecl, nullptr))
+	{
+		for (clang::comments::BlockContentComment* block : fullComment->getBlocks())
+		{
+			if (block->getCommentKind() == clang::comments::Comment::CommentKind::ParamCommandCommentKind)
+			{
+				std::string paragraphStr;
+				clang::comments::ParamCommandComment* paramComment = clang::dyn_cast<clang::comments::ParamCommandComment>(block);
+				if (paramComment->getParamIndex() != paramIndex) continue;
+
+
+				clang::comments::ParagraphComment* paragraph = paramComment->getParagraph();
+				for (clang::comments::Comment::child_iterator it = paragraph->child_begin(); it != paragraph->child_end(); ++it)
+				{
+					clang::comments::TextComment* textComment = clang::dyn_cast<clang::comments::TextComment>(*it);
+					if (textComment == nullptr) continue;
+					if (paragraphStr.length()) paragraphStr += "\\n";
+					paragraphStr += textComment->getText().trim();
+				}
+
+				if (commentStr.length()) commentStr += "\\n";
+				commentStr += paragraphStr;
+			}
+		}
+	}
+	return commentStr;
+}
+
+std::string Utils::GetCommentForFunctionReturn(const clang::FunctionDecl* functionDecl)
+{
+	std::string commentStr;
+	if (functionDecl == nullptr) return commentStr;
+
+	if (clang::comments::FullComment* fullComment = functionDecl->getASTContext().getCommentForDecl(functionDecl, nullptr))
+	{
+		for (clang::comments::BlockContentComment* block : fullComment->getBlocks())
+		{
+			if (block->getCommentKind() == clang::comments::Comment::CommentKind::BlockCommandCommentKind)
+			{
+				std::string paragraphStr;
+				clang::comments::BlockCommandComment* blockComment = clang::dyn_cast<clang::comments::BlockCommandComment>(block);
+				if (blockComment->getCommandID() != clang::comments::CommandTraits::KnownCommandIDs::KCI_return &&
+					blockComment->getCommandID() != clang::comments::CommandTraits::KnownCommandIDs::KCI_returns &&
+					blockComment->getCommandID() != clang::comments::CommandTraits::KnownCommandIDs::KCI_retval) continue;
+
+				clang::comments::ParagraphComment* paragraph = blockComment->getParagraph();
+				for (clang::comments::Comment::child_iterator it = paragraph->child_begin(); it != paragraph->child_end(); ++it)
+				{
+					clang::comments::TextComment* textComment = clang::dyn_cast<clang::comments::TextComment>(*it);
+					if (textComment == nullptr) continue;
+					if (paragraphStr.length()) paragraphStr += "\\n";
+					paragraphStr += textComment->getText().trim();
+				}
+
+				if (commentStr.length()) commentStr += "\\n";
+				commentStr += paragraphStr;
+			}
+		}
+	}
+	return commentStr;
 }
 

@@ -42,6 +42,8 @@ namespace hmdl
 		inline void SetPointerIndirectionLevel(size_t indirectionLevel) { m_PointerIndirectionLevel = indirectionLevel; };
 		inline size_t GetArraySize() const { return m_ArraySize; };
 		inline void SetArraySize(size_t size) { m_ArraySize = size; };
+		inline const char* GetComment() const { return m_Comment; };
+		inline void SetComment(const char* comment) { m_Comment = comment; };
 
 	public:
 		template<class T>
@@ -133,6 +135,7 @@ namespace hmdl
 		size_t m_PointerIndirectionLevel; // todo: TypeInfo*** info has 3 as indirection level
 		size_t m_ArraySize; // non array types has 0 array size
 
+		const char* m_Comment;
 	};
 
 }

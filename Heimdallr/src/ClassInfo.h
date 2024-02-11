@@ -24,6 +24,7 @@ namespace hmdl
 			size_t fieldsSize,
 			const FunctionInfo* functionsArr,
 			size_t functionSize,
+			const char* comment,
 			const std::vector<const IAttribute*>& attrs) :
 			TypeInfo({ id, name, fullname, size, alignment, defaultValue }),
 			m_ParentClasses(parentClassesArr),
@@ -32,6 +33,7 @@ namespace hmdl
 			m_FieldsSize(fieldsSize),
 			m_Functions(functionsArr),
 			m_FunctionsSize(functionSize),
+			m_Comment(comment),
 			IAttributeHolder({ attrs })
 		{};
 
@@ -41,6 +43,7 @@ namespace hmdl
 		inline size_t GetFieldsCount() const { return m_FieldsSize; };
 		inline const FunctionInfo* GetFuntions() const { return m_Functions; };
 		inline size_t GetFuntionsCount() const { return m_FunctionsSize; };
+		inline const char* GetComment() const { return m_Comment; }
 
 		const PropertyInfo* GetField(const char* name) const
 		{
@@ -116,6 +119,7 @@ namespace hmdl
 		size_t m_FieldsSize;
 		const FunctionInfo* m_Functions;
 		size_t m_FunctionsSize;
+		const char* m_Comment;
 
 	};
 

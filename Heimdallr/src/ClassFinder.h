@@ -122,4 +122,7 @@ namespace Utils
     std::string GetAttributes(const clang::Decl* decl);
     std::vector<std::string> GetAttributesList(const clang::Decl* decl);
     std::pair<std::string, std::string> GetParsedAttribute(const std::string& attrStr);
+    std::string GetCommentForDecl(const clang::Decl* decl);
+    std::string GetCommentForFunctionParam(const clang::FunctionDecl* functionDecl, int32_t paramIndex);
+    std::string GetCommentForFunctionReturn(const clang::FunctionDecl* functionDecl);
 }

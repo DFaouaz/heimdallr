@@ -16,6 +16,8 @@ namespace hmdl
 			const PropertyInfo* parameters,
 			size_t parametersSize,
 			std::function<void()>* invokeFuncPtr,
+			const char* comment,
+			const char* returnComment,
 			const std::vector<const IAttribute*>& attrs
 		) :
 			m_Name(name),
@@ -23,6 +25,8 @@ namespace hmdl
 			m_Parameters(parameters),
 			m_ParametersSize(parametersSize),
 			m_InvokeFuncPtr(invokeFuncPtr),
+			m_Comment(comment),
+			m_ReturnComment(returnComment),
 			IAttributeHolder({ attrs })
 		{};
 
@@ -45,12 +49,19 @@ namespace hmdl
 			return func(obj, std::forward<Args>(args)...);
 		}
 
+		inline const char* GetComment() const { return m_Comment; };
+		inline void SetComment(const char* comment) { m_Comment = comment; };
+		inline const char* GetReturnComment() const { return m_ReturnComment; };
+		inline void SetReturnComment(const char* returnComment) { m_ReturnComment = returnComment; };
+
 	private:
 		const char* m_Name;
 		const TypeInfo* m_ReturnType;
 		const PropertyInfo* m_Parameters;
 		size_t m_ParametersSize;
 		std::function<void()>* m_InvokeFuncPtr;
+		const char* m_Comment;
+		const char* m_ReturnComment;
 
 	};
 
