@@ -93,21 +93,21 @@ const hmdl::ClassInfo* cInfo = hmdl::GetClass("TestNamespace::TestClass");
 const hmdl::ClassInfo* cInfo = hmdl::GetClass("TestClass");
 ```
 ## hdml::PropertyInfo
-Holds the information of a given class/struct and its properties.
+Holds the information of a given member variable.
 ```cpp
 const hmdl::ClassInfo* cInfo = hmdl::GetClass<TestClass>();
 const hmdl::PropertyInfo* pInfo = cInfo->GetField("name");
 const hmdl::PropertyInfo* pInfo = cInfo->GetFields()[0];
 ```
 ## hdml::FunctionInfo
-Holds the information of a given class/struct and its properties.
+Holds the information of a given member function.
 ```cpp
 const hmdl::ClassInfo* cInfo = hmdl::GetClass<TestClass>();
 const hmdl::FunctionInfo* fInfo = cInfo->GetMethod("PrintFunction");
 const hmdl::FunctionInfo* fInfo = cInfo->GetMethods()[0];
 ```
 ## hdml::EnumInfo
-Holds the information of a given class/struct.
+Holds the information of a given enum/enum class.
 ```cpp
 const hmdl::EnumInfo* eInfo = hmdl::GetEnum<TestClass::TestEnum>();
 const hmdl::EnumInfo* eInfo = hmdl::GetEnum("TestClass::TestEnum");
